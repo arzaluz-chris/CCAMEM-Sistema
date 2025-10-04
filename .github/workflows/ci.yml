@@ -1,0 +1,247 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20.x'
+
+jobs:
+  # Job 1: Tests Backend
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ccamem
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: ccamem_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Generar Prisma Client
+        working-directory: ./backend
+        run: npm run prisma:generate
+
+      - name: Ejecutar migraciones de base de datos
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://ccamem:testpassword@localhost:5432/ccamem_test
+        run: npx prisma migrate deploy
+
+      - name: Ejecutar tests unitarios
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://ccamem:testpassword@localhost:5432/ccamem_test
+          JWT_SECRET: test-secret-key-for-ci
+          NODE_ENV: test
+        run: npm test -- --coverage --passWithNoTests
+
+      - name: Subir cobertura de código
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
+
+  # Job 2: Linting Backend
+  backend-lint:
+    name: Backend Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Ejecutar ESLint
+        working-directory: ./backend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Ejecutar Prettier
+        working-directory: ./backend
+        run: npm run format -- --check
+        continue-on-error: true
+
+  # Job 3: Build Backend
+  backend-build:
+    name: Backend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Generar Prisma Client
+        working-directory: ./backend
+        run: npm run prisma:generate
+
+      - name: Build TypeScript
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Guardar artefacto de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: backend/dist
+          retention-days: 7
+
+  # Job 4: Tests Frontend
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Ejecutar tests
+        working-directory: ./frontend
+        env:
+          CI: true
+        run: npm test -- --coverage --watchAll=false --passWithNoTests
+
+      - name: Subir cobertura de código
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./frontend/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+        continue-on-error: true
+
+  # Job 5: Build Frontend
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build producción
+        working-directory: ./frontend
+        env:
+          REACT_APP_API_URL: /api
+          CI: false
+        run: npm run build
+
+      - name: Guardar artefacto de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          retention-days: 7
+
+  # Job 6: Análisis de seguridad
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit backend
+        working-directory: ./backend
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Audit frontend
+        working-directory: ./frontend
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+  # Job 7: Resumen de resultados
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [backend-test, backend-lint, backend-build, frontend-test, frontend-build, security-audit]
+    if: always()
+
+    steps:
+      - name: Verificar resultados
+        run: |
+          echo "✅ CI Pipeline completado"
+          echo "Backend Tests: ${{ needs.backend-test.result }}"
+          echo "Backend Lint: ${{ needs.backend-lint.result }}"
+          echo "Backend Build: ${{ needs.backend-build.result }}"
+          echo "Frontend Tests: ${{ needs.frontend-test.result }}"
+          echo "Frontend Build: ${{ needs.frontend-build.result }}"
+          echo "Security Audit: ${{ needs.security-audit.result }}"

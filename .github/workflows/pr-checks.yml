@@ -1,0 +1,136 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # Verificar título del PR
+  pr-title-check:
+    name: Verificar Título del PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validar título
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+
+  # Análisis de cambios
+  changes-analysis:
+    name: Análisis de Cambios
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar archivos modificados
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            database:
+              - 'backend/prisma/**'
+            workflows:
+              - '.github/workflows/**'
+
+      - name: Resumen de cambios
+        run: |
+          echo "### 📊 Resumen de Cambios" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend modificado: ${{ steps.changes.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend modificado: ${{ steps.changes.outputs.frontend }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Base de datos modificada: ${{ steps.changes.outputs.database }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Workflows modificados: ${{ steps.changes.outputs.workflows }}" >> $GITHUB_STEP_SUMMARY
+
+  # Verificar tamaño del PR
+  pr-size-check:
+    name: Verificar Tamaño del PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar tamaño
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const additions = pr.additions;
+            const deletions = pr.deletions;
+            const total = additions + deletions;
+
+            let label = 'size/XS';
+            let message = '✅ PR de tamaño pequeño';
+
+            if (total > 1000) {
+              label = 'size/XL';
+              message = '⚠️ PR muy grande. Considera dividirlo en PRs más pequeños.';
+            } else if (total > 500) {
+              label = 'size/L';
+              message = '⚠️ PR grande. Considera dividirlo si es posible.';
+            } else if (total > 200) {
+              label = 'size/M';
+              message = 'ℹ️ PR de tamaño mediano';
+            } else if (total > 50) {
+              label = 'size/S';
+              message = '✅ PR de tamaño pequeño';
+            }
+
+            console.log(`${message} (${total} líneas cambiadas)`);
+
+            // Agregar comentario si es muy grande
+            if (total > 1000) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: `### ⚠️ Pull Request muy grande\n\n` +
+                      `Este PR modifica **${total}** líneas de código (${additions} adiciones, ${deletions} eliminaciones).\n\n` +
+                      `Considera dividirlo en PRs más pequeños para facilitar la revisión.`
+              });
+            }
+
+  # Comentario automático de bienvenida
+  welcome-comment:
+    name: Comentario de Bienvenida
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+
+    steps:
+      - name: Agregar comentario
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `### 👋 ¡Gracias por tu contribución!\n\n` +
+                    `Tu Pull Request será revisado pronto.\n\n` +
+                    `**Checklist de revisión:**\n` +
+                    `- [ ] Los tests pasan correctamente\n` +
+                    `- [ ] El código sigue los estándares del proyecto\n` +
+                    `- [ ] La documentación está actualizada\n` +
+                    `- [ ] No hay conflictos de merge\n\n` +
+                    `*Este es un comentario automático generado por GitHub Actions*`
+            });

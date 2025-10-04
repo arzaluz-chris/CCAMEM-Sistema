@@ -1,0 +1,358 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CATÁLOGOS
+// ============================================
+
+model UnidadAdministrativa {
+  id          String   @id @default(uuid())
+  clave       String   @unique // OC, UAA, UCSM, UP, OIC, SRSQ, SCAIG, DN, DT, DIS
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  expedientes   Expediente[]
+  usuarios      Usuario[]
+  transferencias Transferencia[] @relation("UnidadOrigen")
+
+  @@map("unidades_administrativas")
+}
+
+model Seccion {
+  id          String   @id @default(uuid())
+  clave       String   @unique // 1S, 2S, 3S, 4S, 1C, 2C, 3C, 4C, 5C
+  nombre      String
+  tipo        TipoSeccion // SUSTANTIVA, COMUN
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  series      Serie[]
+  expedientes Expediente[]
+
+  @@map("secciones")
+}
+
+enum TipoSeccion {
+  SUSTANTIVA
+  COMUN
+}
+
+model Serie {
+  id          String   @id @default(uuid())
+  seccionId   String
+  clave       String   // Número de la serie dentro de la sección
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  seccion     Seccion    @relation(fields: [seccionId], references: [id])
+  subseries   Subserie[]
+  expedientes Expediente[]
+
+  @@unique([seccionId, clave])
+  @@index([seccionId])
+  @@map("series")
+}
+
+model Subserie {
+  id          String   @id @default(uuid())
+  serieId     String
+  clave       String   // Número de la subserie
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  serie       Serie        @relation(fields: [serieId], references: [id])
+  expedientes Expediente[]
+
+  @@unique([serieId, clave])
+  @@index([serieId])
+  @@map("subseries")
+}
+
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
+model Usuario {
+  id                    String   @id @default(uuid())
+  username              String   @unique
+  email                 String   @unique
+  password              String // Hash bcrypt
+  nombre                String
+  apellidoPaterno       String
+  apellidoMaterno       String?
+  rol                   RolUsuario
+  unidadAdministrativaId String?
+  activo                Boolean  @default(true)
+  ultimoAcceso          DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relaciones
+  unidadAdministrativa  UnidadAdministrativa? @relation(fields: [unidadAdministrativaId], references: [id])
+  expedientesCreados    Expediente[]          @relation("ExpedienteCreador")
+  expedientesActualizados Expediente[]        @relation("ExpedienteActualizador")
+  bitacoras             Bitacora[]
+  prestamosRealizados   Prestamo[]            @relation("PrestamoUsuario")
+  prestamosAutorizados  Prestamo[]            @relation("PrestamoAutorizador")
+  transferenciasCreadas Transferencia[]
+
+  @@index([unidadAdministrativaId])
+  @@map("usuarios")
+}
+
+enum RolUsuario {
+  ADMIN
+  COORDINADOR_ARCHIVO
+  RESPONSABLE_AREA
+  OPERADOR
+  CONSULTA
+}
+
+// ============================================
+// EXPEDIENTES Y LEGAJOS
+// ============================================
+
+model Expediente {
+  id                     String   @id @default(uuid())
+  numeroProgresivo       Int      @default(autoincrement())
+  numeroExpediente       String
+  unidadAdministrativaId String
+  seccionId              String
+  serieId                String
+  subserieId             String?
+  formulaClasificadora   String   // Generado automáticamente: CCAMEM/SECCION/SERIE/SUBSERIE/EXP
+  nombreExpediente       String
+  asunto                 String   @db.Text
+
+  // Información física
+  totalLegajos           Int      @default(1)
+  totalDocumentos        Int      @default(0)
+  totalFojas             Int      @default(0)
+
+  // Fechas
+  fechaApertura          DateTime
+  fechaCierre            DateTime?
+
+  // Valores documentales
+  valorAdministrativo    Boolean  @default(false)
+  valorLegal             Boolean  @default(false)
+  valorContable          Boolean  @default(false)
+  valorFiscal            Boolean  @default(false)
+
+  // Clasificación de información
+  clasificacionInfo      ClasificacionInfo @default(PUBLICA)
+
+  // Ubicación física
+  ubicacionFisica        String?  // Estante, anaquel, caja, etc.
+
+  // Estado
+  estado                 EstadoExpediente @default(ACTIVO)
+  observaciones          String?  @db.Text
+
+  // Auditoría
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  createdById            String
+  updatedById            String?
+
+  // Relaciones
+  unidadAdministrativa   UnidadAdministrativa @relation(fields: [unidadAdministrativaId], references: [id])
+  seccion                Seccion             @relation(fields: [seccionId], references: [id])
+  serie                  Serie               @relation(fields: [serieId], references: [id])
+  subserie               Subserie?           @relation(fields: [subserieId], references: [id])
+  createdBy              Usuario             @relation("ExpedienteCreador", fields: [createdById], references: [id])
+  updatedBy              Usuario?            @relation("ExpedienteActualizador", fields: [updatedById], references: [id])
+
+  legajos                Legajo[]
+  bitacoras              Bitacora[]
+  prestamos              Prestamo[]
+  transferencias         Transferencia[]
+
+  @@unique([unidadAdministrativaId, numeroExpediente])
+  @@index([unidadAdministrativaId])
+  @@index([seccionId])
+  @@index([serieId])
+  @@index([estado])
+  @@index([fechaApertura])
+  @@index([formulaClasificadora])
+  @@map("expedientes")
+}
+
+enum ClasificacionInfo {
+  PUBLICA
+  RESERVADA
+  CONFIDENCIAL
+}
+
+enum EstadoExpediente {
+  ACTIVO
+  CERRADO
+  PRESTADO
+  TRANSFERIDO
+  BAJA
+}
+
+model Legajo {
+  id           String   @id @default(uuid())
+  expedienteId String
+  numeroLegajo Int
+  descripcion  String?
+  fojas        Int      @default(0)
+  observaciones String? @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  expediente   Expediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+
+  @@unique([expedienteId, numeroLegajo])
+  @@index([expedienteId])
+  @@map("legajos")
+}
+
+// ============================================
+// BITÁCORA DE AUDITORÍA
+// ============================================
+
+model Bitacora {
+  id           String        @id @default(uuid())
+  expedienteId String?
+  usuarioId    String
+  accion       AccionBitacora
+  entidad      String        // Expediente, Usuario, Prestamo, etc.
+  entidadId    String
+  descripcion  String        @db.Text
+  datosPrevios Json?         // Snapshot antes del cambio
+  datosNuevos  Json?         // Snapshot después del cambio
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime      @default(now())
+
+  // Relaciones
+  expediente   Expediente? @relation(fields: [expedienteId], references: [id])
+  usuario      Usuario     @relation(fields: [usuarioId], references: [id])
+
+  @@index([expedienteId])
+  @@index([usuarioId])
+  @@index([entidad, entidadId])
+  @@index([createdAt])
+  @@map("bitacoras")
+}
+
+enum AccionBitacora {
+  CREAR
+  ACTUALIZAR
+  ELIMINAR
+  CONSULTAR
+  PRESTAR
+  DEVOLVER
+  TRANSFERIR
+  LOGIN
+  LOGOUT
+}
+
+// ============================================
+// PRÉSTAMOS
+// ============================================
+
+model Prestamo {
+  id                 String         @id @default(uuid())
+  expedienteId       String
+  usuarioId          String         // Usuario que solicita
+  autorizadoPorId    String?        // Usuario que autoriza
+  fechaPrestamo      DateTime       @default(now())
+  fechaDevolucionEsperada DateTime
+  fechaDevolucionReal DateTime?
+  motivoPrestamo     String         @db.Text
+  observaciones      String?        @db.Text
+  estado             EstadoPrestamo @default(PENDIENTE)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  // Relaciones
+  expediente     Expediente @relation(fields: [expedienteId], references: [id])
+  usuario        Usuario    @relation("PrestamoUsuario", fields: [usuarioId], references: [id])
+  autorizadoPor  Usuario?   @relation("PrestamoAutorizador", fields: [autorizadoPorId], references: [id])
+
+  @@index([expedienteId])
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([fechaPrestamo])
+  @@map("prestamos")
+}
+
+enum EstadoPrestamo {
+  PENDIENTE
+  AUTORIZADO
+  PRESTADO
+  DEVUELTO
+  VENCIDO
+  RECHAZADO
+}
+
+// ============================================
+// TRANSFERENCIAS
+// ============================================
+
+model Transferencia {
+  id                      String            @id @default(uuid())
+  expedienteId            String
+  unidadOrigenId          String
+  tipoTransferencia       TipoTransferencia
+  fechaTransferencia      DateTime          @default(now())
+  descripcion             String            @db.Text
+  documentoSoporte        String?           // Ruta al documento de transferencia
+  estado                  EstadoTransferencia @default(PENDIENTE)
+  observaciones           String?           @db.Text
+  createdById             String
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  // Relaciones
+  expediente    Expediente           @relation(fields: [expedienteId], references: [id])
+  unidadOrigen  UnidadAdministrativa @relation("UnidadOrigen", fields: [unidadOrigenId], references: [id])
+  createdBy     Usuario              @relation(fields: [createdById], references: [id])
+
+  @@index([expedienteId])
+  @@index([unidadOrigenId])
+  @@index([estado])
+  @@index([fechaTransferencia])
+  @@map("transferencias")
+}
+
+enum TipoTransferencia {
+  PRIMARIA  // De archivo de trámite a concentración
+  SECUNDARIA // De archivo de concentración a histórico
+  BAJA      // Eliminación de documentación
+}
+
+enum EstadoTransferencia {
+  PENDIENTE
+  AUTORIZADA
+  COMPLETADA
+  RECHAZADA
+}

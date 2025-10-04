@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ccamem-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ccamem
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ccamem_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ccamem-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccamem -d ccamem_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PgAdmin - Administración de PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ccamem-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ccamem.gob.mx
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - ccamem-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Backend API (opcional - descomentar cuando esté listo para producción)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: ccamem-backend
+  #   restart: unless-stopped
+  #   environment:
+  #     DATABASE_URL: "postgresql://ccamem:password@postgres:5432/ccamem_db"
+  #     NODE_ENV: production
+  #     PORT: 3001
+  #   ports:
+  #     - "3001:3001"
+  #   volumes:
+  #     - ./backend/uploads:/app/uploads
+  #   networks:
+  #     - ccamem-network
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
+  # Redis para cache (opcional)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: ccamem-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - ccamem-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  # redis_data:
+  #   driver: local
+
+networks:
+  ccamem-network:
+    driver: bridge
