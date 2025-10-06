@@ -22,10 +22,23 @@ const PORT = process.env.PORT || 3001;
 // Seguridad con Helmet
 app.use(helmet());
 
-// CORS
+// CORS - permitir múltiples orígenes para desarrollo
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3003',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Permitir peticiones sin origen (como Postman) o desde orígenes permitidos
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('No permitido por CORS'));
+      }
+    },
     credentials: true,
   })
 );

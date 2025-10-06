@@ -7,6 +7,9 @@ const router = Router();
 // Todas las rutas requieren autenticación
 router.use(authenticate);
 
+// Estadísticas para el dashboard
+router.get('/stats', reportesController.getStats.bind(reportesController));
+
 // Reportes de inventario
 router.get('/inventario/general', reportesController.generarInventarioGeneral.bind(reportesController));
 router.get('/inventario/unidad/:unidadId', reportesController.generarInventarioPorUnidad.bind(reportesController));

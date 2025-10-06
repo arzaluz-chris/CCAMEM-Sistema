@@ -75,6 +75,27 @@ export class ReportesController {
     }
   }
 
+  // Obtener estadísticas para el dashboard
+  async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('No autenticado', 401);
+      }
+
+      const stats = await reportesService.obtenerEstadisticas(
+        req.user.rol,
+        req.user.unidadAdministrativaId
+      );
+
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Generar reporte de estadísticas
   async generarEstadisticas(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

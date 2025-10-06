@@ -4,6 +4,93 @@ import { AppError } from '../middleware/errorHandler';
 import { Prisma } from '@prisma/client';
 
 export class ReportesService {
+  // Obtener estadísticas para el dashboard
+  async obtenerEstadisticas(userRol?: string, userUnidadId?: string | null) {
+    const where: any = {};
+
+    if (userRol !== 'ADMIN' && userRol !== 'COORDINADOR_ARCHIVO' && userUnidadId) {
+      where.unidadAdministrativaId = userUnidadId;
+    }
+
+    const [
+      totalExpedientes,
+      expedientesActivos,
+      expedientesCerrados,
+      expedientesTransferidos,
+      expedientesPorEstado,
+      expedientesPorUnidad,
+      totalLegajos,
+      totalFojas,
+      prestamosPendientes,
+      prestamosActivos,
+    ] = await Promise.all([
+      prisma.expediente.count({ where }),
+      prisma.expediente.count({ where: { ...where, estado: 'ACTIVO' } }),
+      prisma.expediente.count({ where: { ...where, estado: 'CERRADO' } }),
+      prisma.expediente.count({ where: { ...where, estado: 'TRANSFERIDO' } }),
+      prisma.expediente.groupBy({
+        by: ['estado'],
+        _count: true,
+        where,
+      }),
+      prisma.expediente.groupBy({
+        by: ['unidadAdministrativaId'],
+        _count: true,
+        where,
+      }),
+      prisma.expediente.aggregate({
+        _sum: { totalLegajos: true },
+        where,
+      }),
+      prisma.expediente.aggregate({
+        _sum: { totalFojas: true },
+        where,
+      }),
+      prisma.prestamo.count({
+        where: {
+          estado: 'PENDIENTE',
+        },
+      }),
+      prisma.prestamo.count({
+        where: {
+          estado: 'PRESTADO',
+        },
+      }),
+    ]);
+
+    // Obtener nombres de unidades
+    const unidadesIds = expedientesPorUnidad.map((u) => u.unidadAdministrativaId);
+    const unidades = await prisma.unidadAdministrativa.findMany({
+      where: { id: { in: unidadesIds } },
+    });
+
+    const expedientesPorUnidadConNombre = expedientesPorUnidad.map((item) => {
+      const unidad = unidades.find((u) => u.id === item.unidadAdministrativaId);
+      return {
+        unidad: unidad?.nombre || 'Sin unidad',
+        unidadClave: unidad?.clave || '',
+        total: item._count,
+      };
+    });
+
+    return {
+      totalExpedientes,
+      expedientesActivos,
+      expedientesCerrados,
+      expedientesTransferidos,
+      totalLegajos: totalLegajos._sum.totalLegajos || 0,
+      totalFojas: totalFojas._sum.totalFojas || 0,
+      prestamosPendientes,
+      prestamosActivos,
+      expedientesPorEstado: expedientesPorEstado.map((item) => ({
+        estado: item.estado,
+        total: item._count,
+      })),
+      expedientesPorUnidad: expedientesPorUnidadConNombre,
+      expedientesPorMes: [], // Por ahora vacío, se puede implementar después
+    };
+  }
+
   // Generar reporte de inventario general en Excel
   async generarInventarioExcel(
     filters: any = {},
