@@ -22,9 +22,7 @@ const createExpedienteSchema = Joi.object({
   nombreExpediente: Joi.string().required().messages({
     'string.empty': 'El nombre del expediente es requerido',
   }),
-  asunto: Joi.string().required().messages({
-    'string.empty': 'El asunto es requerido',
-  }),
+  asunto: Joi.string().allow('', null),
   totalLegajos: Joi.number().integer().min(1).default(1),
   totalDocumentos: Joi.number().integer().min(0).default(0),
   totalFojas: Joi.number().integer().min(0).default(0),
@@ -37,6 +35,7 @@ const createExpedienteSchema = Joi.object({
   valorContable: Joi.boolean().default(false),
   valorFiscal: Joi.boolean().default(false),
   clasificacionInfo: Joi.string().valid('PUBLICA', 'RESERVADA', 'CONFIDENCIAL').default('PUBLICA'),
+  fundamentoLegal: Joi.string().allow('', null),
   ubicacionFisica: Joi.string().allow('', null),
   observaciones: Joi.string().allow('', null),
 });
@@ -54,6 +53,7 @@ const updateExpedienteSchema = Joi.object({
   valorContable: Joi.boolean(),
   valorFiscal: Joi.boolean(),
   clasificacionInfo: Joi.string().valid('PUBLICA', 'RESERVADA', 'CONFIDENCIAL'),
+  fundamentoLegal: Joi.string().allow('', null),
   ubicacionFisica: Joi.string().allow('', null),
   estado: Joi.string().valid('ACTIVO', 'CERRADO', 'PRESTADO', 'TRANSFERIDO', 'BAJA'),
   observaciones: Joi.string().allow('', null),

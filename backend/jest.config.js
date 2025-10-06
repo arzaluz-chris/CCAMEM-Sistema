@@ -17,5 +17,6 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,
   testTimeout: 30000,
+  setupFiles: ['<rootDir>/jest.setup.js'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
 };

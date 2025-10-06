@@ -123,18 +123,20 @@ const startServer = async (): Promise<void> => {
   }
 };
 
-// Iniciar servidor
-startServer();
+// Solo iniciar servidor si no estamos en modo test
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
 
-// Manejo de errores no capturados
-process.on('unhandledRejection', (reason: Error) => {
-  console.error('❌ Unhandled Rejection:', reason);
-  process.exit(1);
-});
+  // Manejo de errores no capturados
+  process.on('unhandledRejection', (reason: Error) => {
+    console.error('❌ Unhandled Rejection:', reason);
+    process.exit(1);
+  });
 
-process.on('uncaughtException', (error: Error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
+  process.on('uncaughtException', (error: Error) => {
+    console.error('❌ Uncaught Exception:', error);
+    process.exit(1);
+  });
+}
 
 export default app;

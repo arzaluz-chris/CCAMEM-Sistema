@@ -9,7 +9,7 @@ export interface CreateExpedienteDto {
   serieId: string;
   subserieId?: string;
   nombreExpediente: string;
-  asunto: string;
+  asunto?: string;
   totalLegajos?: number;
   totalDocumentos?: number;
   totalFojas?: number;
@@ -20,6 +20,7 @@ export interface CreateExpedienteDto {
   valorContable?: boolean;
   valorFiscal?: boolean;
   clasificacionInfo?: 'PUBLICA' | 'RESERVADA' | 'CONFIDENCIAL';
+  fundamentoLegal?: string;
   ubicacionFisica?: string;
   observaciones?: string;
 }
@@ -37,6 +38,7 @@ export interface UpdateExpedienteDto {
   valorContable?: boolean;
   valorFiscal?: boolean;
   clasificacionInfo?: 'PUBLICA' | 'RESERVADA' | 'CONFIDENCIAL';
+  fundamentoLegal?: string;
   ubicacionFisica?: string;
   estado?: EstadoExpediente;
   observaciones?: string;

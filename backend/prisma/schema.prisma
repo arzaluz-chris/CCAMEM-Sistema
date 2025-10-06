@@ -146,7 +146,7 @@ model Expediente {
   subserieId             String?
   formulaClasificadora   String   // Generado automáticamente: CCAMEM/SECCION/SERIE/SUBSERIE/EXP
   nombreExpediente       String
-  asunto                 String   @db.Text
+  asunto                 String?  @db.Text
 
   // Información física
   totalLegajos           Int      @default(1)
@@ -165,6 +165,7 @@ model Expediente {
 
   // Clasificación de información
   clasificacionInfo      ClasificacionInfo @default(PUBLICA)
+  fundamentoLegal        String?  @db.Text // Fundamento legal para clasificación RESERVADA/CONFIDENCIAL
 
   // Ubicación física
   ubicacionFisica        String?  // Estante, anaquel, caja, etc.

@@ -51,3 +51,22 @@ coverage/
 # =========================================
 /backend/prisma/dev.db
 /backend/prisma/dev.db-journal
+
+# =========================================
+# Archivos Compilados de TypeScript
+# =========================================
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+!jest.config.js
+!jest.setup.js
+!craco.config.js
+!*.config.js
+!frontend/public/**/*.js
+
+# =========================================
+# Test Environment
+# =========================================
+.env.test
+backend/.env.test
