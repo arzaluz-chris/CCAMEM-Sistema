@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test Login</title></head>
+<body>
+<h1>Test Login</h1>
+<button onclick="testLogin()">Test Login</button>
+<button onclick="checkStorage()">Check Storage</button>
+<pre id="output"></pre>
+
+<script>
+async function testLogin() {
+  const output = document.getElementById('output');
+  try {
+    const response = await fetch('http://localhost:3001/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    });
+    const data = await response.json();
+    output.textContent = JSON.stringify(data, null, 2);
+    
+    if (data.success) {
+      sessionStorage.setItem('token', data.data.accessToken);
+      sessionStorage.setItem('refreshToken', data.data.refreshToken);
+      output.textContent += '\n\nToken guardado en sessionStorage';
+    }
+  } catch (error) {
+    output.textContent = 'Error: ' + error.message;
+  }
+}
+
+function checkStorage() {
+  const output = document.getElementById('output');
+  output.textContent = 'sessionStorage token: ' + sessionStorage.getItem('token') + '\n';
+  output.textContent += 'localStorage token: ' + localStorage.getItem('token');
+}
+</script>
+</body>
+</html>
