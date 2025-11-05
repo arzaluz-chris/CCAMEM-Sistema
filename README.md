@@ -1,8 +1,5 @@
 # Sistema de Gestión Archivística CCAMEM
 
-![CI Status](https://github.com/YOUR-USERNAME/ccamem-sistema/workflows/CI%20-%20Continuous%20Integration/badge.svg)
-![CodeQL](https://github.com/YOUR-USERNAME/ccamem-sistema/workflows/CodeQL%20Security%20Analysis/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)
 
@@ -47,10 +44,9 @@ Sistema desarrollado para digitalizar el proceso de gestión archivística de la
 - Recharts para gráficas
 - Cypress para testing E2E
 
-**DevOps:**
-- Docker & Docker Compose
-- PostgreSQL en contenedor
-- Volúmenes persistentes
+**Base de Datos:**
+- PostgreSQL 15
+- Prisma ORM
 
 ---
 
@@ -72,7 +68,7 @@ ccamem-sistema/
 │   │   ├── schema.prisma    # Modelo de datos
 │   │   ├── migrations/      # Migraciones
 │   │   └── seed.ts          # Datos iniciales
-│   ├── .env                 # Variables de entorno
+│   ├── .env.example         # Plantilla de variables de entorno
 │   ├── tsconfig.json
 │   └── package.json
 ├── frontend/
@@ -89,12 +85,10 @@ ccamem-sistema/
 │   │   ├── e2e/             # Tests E2E
 │   │   └── support/         # Configuración Cypress
 │   ├── public/
-│   ├── .env                 # Variables de entorno
+│   ├── .env.example         # Plantilla de variables de entorno
 │   ├── tsconfig.json
 │   └── package.json
-├── docker-compose.yml       # Orquestación de contenedores
 ├── CLAUDE.md                # Guía para Claude Code
-├── IMPLEMENTACION-COMPLETA.md
 └── README.md                # Este archivo
 ```
 
@@ -105,7 +99,7 @@ ccamem-sistema/
 ### Prerrequisitos
 
 - Node.js 20+ y npm 9+
-- Docker y Docker Compose
+- PostgreSQL 15+
 - Git
 
 ### 1. Clonar el Repositorio
@@ -173,16 +167,21 @@ cd ../frontend
 npm install
 ```
 
-### 4. Configurar Base de Datos con Docker
+### 4. Configurar Base de Datos
+
+Asegúrate de tener PostgreSQL instalado y corriendo. Crea la base de datos:
 
 ```bash
-# Desde la raíz del proyecto
-docker-compose up -d
+# Conectar a PostgreSQL
+psql -U postgres
+
+# Crear base de datos
+CREATE DATABASE ccamem_db;
+CREATE USER ccamem WITH PASSWORD 'password';
+GRANT ALL PRIVILEGES ON DATABASE ccamem_db TO ccamem;
 ```
 
-Esto levantará:
-- PostgreSQL en puerto 5432
-- PgAdmin en puerto 5050 (opcional)
+Actualiza la variable `DATABASE_URL` en `backend/.env` con tus credenciales.
 
 ### 5. Ejecutar Migraciones y Seed
 
@@ -207,8 +206,6 @@ El seed creará:
 
 ## 🎮 Ejecución en Desarrollo
 
-### Opción 1: Modo Desarrollo Local
-
 **Terminal 1 - Backend:**
 ```bash
 cd backend
@@ -222,12 +219,6 @@ cd frontend
 npm start
 ```
 Frontend corriendo en: http://localhost:3000
-
-### Opción 2: Con Docker Compose (Próximamente)
-
-```bash
-docker-compose -f docker-compose.dev.yml up
-```
 
 ---
 
@@ -431,80 +422,18 @@ npm test                 # Ejecutar tests
 
 ---
 
-## 📦 Despliegue a Producción
-
-### 🚀 Deployment Rápido (Vercel + Railway)
-
-El proyecto está configurado para deployment en:
-- **Frontend:** Vercel (gratuito)
-- **Backend + DB:** Railway (plan gratuito disponible)
-
-**Guía completa:** Ver [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-### Pasos Resumidos
-
-1. **Backend en Railway:**
-   - Crear proyecto en [railway.app](https://railway.app)
-   - Conectar repositorio de GitHub
-   - Agregar PostgreSQL
-   - Configurar variables de entorno
-   - Deploy automático
-
-2. **Frontend en Vercel:**
-   - Crear proyecto en [vercel.com](https://vercel.com)
-   - Importar repositorio
-   - Configurar `REACT_APP_API_URL`
-   - Deploy automático
-
-3. **Configurar CORS:**
-   - Actualizar `FRONTEND_URL` en Railway
-   - Redeploy automático
-
-**⏱️ Tiempo estimado:** 15-20 minutos
-
-### Archivos de Configuración
-
-- `vercel.json` - Configuración de Vercel
-- `railway.json` - Configuración de Railway
-- `Procfile` - Comandos de inicio
-- `.env.production.example` - Variables de entorno de producción
-
-### Opciones Alternativas
-
-**Backend:**
-- Railway ⭐ (Recomendado)
-- Render
-- Heroku
-- AWS EC2/ECS
-- DigitalOcean
-
-**Frontend:**
-- Vercel ⭐ (Recomendado)
-- Netlify
-- AWS S3 + CloudFront
-- GitHub Pages
-
-**Base de Datos:**
-- Railway PostgreSQL ⭐ (Recomendado)
-- AWS RDS
-- Supabase
-- DigitalOcean Managed PostgreSQL
-
----
-
 ## 🐛 Troubleshooting
 
 ### Error: "Cannot connect to database"
 
 ```bash
-# Verificar que Docker esté corriendo
-docker ps
+# Verificar que PostgreSQL esté corriendo
+sudo systemctl status postgresql
 
-# Reiniciar contenedor de PostgreSQL
-docker-compose restart postgres
+# Verificar la conexión
+psql -U ccamem -d ccamem_db
 
-# Verificar logs
-docker-compose logs postgres
+# Revisar el DATABASE_URL en backend/.env
 ```
 
 ### Error: "Port 3001 already in use"
@@ -539,11 +468,7 @@ npm install
 
 ## 📖 Documentación Adicional
 
-- **[CLAUDE.md](./CLAUDE.md)**: Guía de implementación con Claude Code
-- **[CLAUDE-BACKEND.md](./CLAUDE-BACKEND.md)**: Detalles del backend
-- **[CLAUDE-FRONTEND.md](./CLAUDE-FRONTEND.md)**: Detalles del frontend
-- **[CLAUDE-DEPLOYMENT.md](./CLAUDE-DEPLOYMENT.md)**: Guía de deployment
-- **[IMPLEMENTACION-COMPLETA.md](./IMPLEMENTACION-COMPLETA.md)**: Resumen de implementación
+- **[CLAUDE.md](./CLAUDE.md)**: Guía de desarrollo con Claude Code
 
 ---
 
@@ -612,5 +537,5 @@ Para reportar bugs o solicitar nuevas funcionalidades, por favor contactar a:
 
 ---
 
-**Última actualización:** Octubre 2025
+**Última actualización:** Noviembre 2024
 **Versión:** 1.0.0
