@@ -75,6 +75,40 @@ export class ReportesController {
     }
   }
 
+  // Generar inventario UAA (interno)
+  async generarInventarioUAA(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      if (!req.user) {
+        throw new AppError('No autenticado', 401);
+      }
+
+      const unidadId = (req.params.unidadId || req.query.unidadId) as string;
+
+      const buffer = await reportesService.generarInventarioUAA(
+        unidadId,
+        req.user.rol,
+        req.user.unidadAdministrativaId
+      );
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=inventario_uaa_interno_${new Date().getTime()}.xlsx`
+      );
+
+      res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Obtener estadísticas para el dashboard
   async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

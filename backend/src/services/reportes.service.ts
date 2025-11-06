@@ -91,8 +91,8 @@ export class ReportesService {
     };
   }
 
-  // Generar reporte de inventario general en Excel
-  async generarInventarioExcel(
+  // Generar INVENTARIO GENERAL (formato InventarioSRSQ.xlsx)
+  async generarInventarioGeneral(
     filters: any = {},
     userRol?: string,
     userUnidadId?: string | null
@@ -126,118 +126,327 @@ export class ReportesService {
         seccion: true,
         serie: true,
         subserie: true,
-        legajos: true,
       },
     });
 
-    // Crear libro de Excel
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Inventario de Expedientes');
+    // Obtener nombre de la unidad para el encabezado
+    let nombreUnidad = 'Todas las Unidades';
+    if (filters.unidadAdministrativaId) {
+      const unidad = await prisma.unidadAdministrativa.findUnique({
+        where: { id: filters.unidadAdministrativaId },
+      });
+      nombreUnidad = unidad?.nombre || nombreUnidad;
+    }
 
-    // Configurar columnas
-    worksheet.columns = [
-      { header: 'No. Progresivo', key: 'numeroProgresivo', width: 15 },
-      { header: 'No. Expediente', key: 'numeroExpediente', width: 20 },
-      { header: 'Unidad', key: 'unidad', width: 15 },
-      { header: 'Sección', key: 'seccion', width: 15 },
-      { header: 'Serie', key: 'serie', width: 40 },
-      { header: 'Subserie', key: 'subserie', width: 40 },
-      { header: 'Fórmula Clasificadora', key: 'formula', width: 45 },
-      { header: 'Nombre del Expediente', key: 'nombre', width: 50 },
-      { header: 'Asunto', key: 'asunto', width: 60 },
-      { header: 'Fecha Apertura', key: 'fechaApertura', width: 15 },
-      { header: 'Fecha Cierre', key: 'fechaCierre', width: 15 },
-      { header: 'Legajos', key: 'legajos', width: 10 },
-      { header: 'Documentos', key: 'documentos', width: 12 },
-      { header: 'Fojas', key: 'fojas', width: 10 },
-      { header: 'Valor Administrativo', key: 'valorAdmin', width: 10 },
-      { header: 'Valor Legal', key: 'valorLegal', width: 10 },
-      { header: 'Valor Contable', key: 'valorContable', width: 10 },
-      { header: 'Valor Fiscal', key: 'valorFiscal', width: 10 },
-      { header: 'Clasificación', key: 'clasificacion', width: 15 },
-      { header: 'Ubicación Física', key: 'ubicacion', width: 30 },
-      { header: 'Estado', key: 'estado', width: 15 },
-      { header: 'Observaciones', key: 'observaciones', width: 40 },
+    // Crear libro de Excel según formato InventarioSRSQ.xlsx
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Hoja1');
+
+    // Fila 5: Título principal
+    worksheet.mergeCells('B5:M5');
+    const titleCell = worksheet.getCell('B5');
+    titleCell.value = 'INVENTARIO GENERAL DE ARCHIVO';
+    titleCell.font = { bold: true, size: 14 };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Fila 10: Dependencia y fecha
+    worksheet.getCell('B10').value = 'DEPENDENCIA U ORGANISMO: Comisión de Conciliación y Arbitraje Médico del Estado de México';
+    worksheet.getCell('J10').value = 'FECHA DE ELABORACIÓN';
+
+    const hoy = new Date();
+    worksheet.getCell('K11').value = hoy.getDate();
+    worksheet.getCell('L11').value = hoy.getMonth() + 1;
+    worksheet.getCell('M11').value = hoy.getFullYear();
+
+    // Fila 13: Unidad administrativa
+    worksheet.getCell('B13').value = `UNIDAD ADMINISTRATIVA: ${nombreUnidad}`;
+    worksheet.getCell('K13').value = 'DÍA';
+    worksheet.getCell('L13').value = 'MES';
+    worksheet.getCell('M13').value = 'AÑO';
+
+    // Fila 17: Encabezados de tabla
+    const headers = [
+      { cell: 'B17', value: 'NO. PROGRESIVO' },
+      { cell: 'C17', value: 'NO. DEL EXPEDIENTE' },
+      { cell: 'D17', value: 'SECCIÓN Y/O SUBSECCIÓN' },
+      { cell: 'E17', value: 'SERIE Y/O SUBSERIE DOCUMENTAL' },
+      { cell: 'F17', value: 'FÓRMULA CLASIFICADORA' },
+      { cell: 'G17', value: 'NOMBRE DEL EXPEDIENTE' },
+      { cell: 'H17', value: 'TOTAL DE LEGAJOS' },
+      { cell: 'I17', value: 'TOTAL DE DOCS' },
+      { cell: 'J17', value: 'FECHA DE LOS DOCUMENTOS' },
+      { cell: 'L17', value: 'UBICACIÓN FÍSICA DEL ARCHIVO DE TRÁMITE' },
+      { cell: 'M17', value: 'OBSERVACIONES' },
     ];
 
-    // Estilo de encabezados
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF0070C0' },
-    };
-    worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-
-    // Agregar datos
-    expedientes.forEach((exp) => {
-      worksheet.addRow({
-        numeroProgresivo: exp.numeroProgresivo,
-        numeroExpediente: exp.numeroExpediente,
-        unidad: exp.unidadAdministrativa.clave,
-        seccion: exp.seccion.clave,
-        serie: exp.serie.nombre,
-        subserie: exp.subserie?.nombre || '',
-        formula: exp.formulaClasificadora,
-        nombre: exp.nombreExpediente,
-        asunto: exp.asunto,
-        fechaApertura: exp.fechaApertura.toLocaleDateString('es-MX'),
-        fechaCierre: exp.fechaCierre?.toLocaleDateString('es-MX') || '',
-        legajos: exp.totalLegajos,
-        documentos: exp.totalDocumentos,
-        fojas: exp.totalFojas,
-        valorAdmin: exp.valorAdministrativo ? 'Sí' : 'No',
-        valorLegal: exp.valorLegal ? 'Sí' : 'No',
-        valorContable: exp.valorContable ? 'Sí' : 'No',
-        valorFiscal: exp.valorFiscal ? 'Sí' : 'No',
-        clasificacion: exp.clasificacionInfo,
-        ubicacion: exp.ubicacionFisica || '',
-        estado: exp.estado,
-        observaciones: exp.observaciones || '',
-      });
+    headers.forEach(({ cell, value }) => {
+      const excelCell = worksheet.getCell(cell);
+      excelCell.value = value;
+      excelCell.font = { bold: true };
+      excelCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      excelCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' },
+      };
+      excelCell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
     });
 
-    // Agregar bordes a todas las celdas
-    worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
+    // Fila 18: Sub-encabezados para fechas
+    worksheet.getCell('J18').value = 'PRIMERO';
+    worksheet.getCell('K18').value = 'ÚLTIMO';
+    ['J18', 'K18'].forEach(cell => {
+      const excelCell = worksheet.getCell(cell);
+      excelCell.font = { bold: true };
+      excelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      excelCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' },
+      };
+      excelCell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    // Agregar datos (a partir de fila 19)
+    let currentRow = 19;
+    expedientes.forEach((exp) => {
+      // Generar serie/subserie con formato especial
+      let serieTexto = `${exp.serie.clave} ${exp.serie.nombre}`;
+      if (exp.subserie) {
+        serieTexto += ` / ${exp.subserie.clave} ${exp.subserie.nombre}`;
+      }
+
+      // Formatear fechas
+      const fechaPrimero = exp.fechaApertura ?
+        exp.fechaApertura.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+      const fechaUltimo = exp.fechaCierre ?
+        exp.fechaCierre.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+
+      worksheet.getCell(`B${currentRow}`).value = exp.numeroProgresivo;
+      worksheet.getCell(`C${currentRow}`).value = exp.numeroExpediente;
+      worksheet.getCell(`D${currentRow}`).value = exp.seccion.clave;
+      worksheet.getCell(`E${currentRow}`).value = serieTexto;
+      worksheet.getCell(`F${currentRow}`).value = exp.formulaClasificadora;
+      worksheet.getCell(`G${currentRow}`).value = exp.nombreExpediente;
+      worksheet.getCell(`H${currentRow}`).value = exp.totalLegajos;
+      worksheet.getCell(`I${currentRow}`).value = exp.totalDocumentos;
+      worksheet.getCell(`J${currentRow}`).value = fechaPrimero;
+      worksheet.getCell(`K${currentRow}`).value = fechaUltimo;
+      worksheet.getCell(`L${currentRow}`).value = exp.ubicacionFisica || exp.unidadAdministrativa.clave;
+      worksheet.getCell(`M${currentRow}`).value = exp.observaciones || 'NINGUNA';
+
+      // Aplicar bordes a todas las celdas de datos
+      ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'].forEach(col => {
+        const cell = worksheet.getCell(`${col}${currentRow}`);
         cell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
           bottom: { style: 'thin' },
           right: { style: 'thin' },
         };
+        cell.alignment = { vertical: 'middle' };
       });
+
+      currentRow++;
     });
 
-    // Agregar fila de totales
-    const totalRow = worksheet.addRow({
-      numeroProgresivo: '',
-      numeroExpediente: '',
-      unidad: '',
-      seccion: '',
-      serie: '',
-      subserie: '',
-      formula: '',
-      nombre: '',
-      asunto: '',
-      fechaApertura: '',
-      fechaCierre: 'TOTALES:',
-      legajos: { formula: `SUM(L2:L${expedientes.length + 1})` },
-      documentos: { formula: `SUM(M2:M${expedientes.length + 1})` },
-      fojas: { formula: `SUM(N2:N${expedientes.length + 1})` },
-    });
-
-    totalRow.font = { bold: true };
-    totalRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFD9E1F2' },
-    };
+    // Ajustar anchos de columna
+    worksheet.getColumn('B').width = 15; // NO. PROGRESIVO
+    worksheet.getColumn('C').width = 18; // NO. DEL EXPEDIENTE
+    worksheet.getColumn('D').width = 12; // SECCIÓN
+    worksheet.getColumn('E').width = 35; // SERIE
+    worksheet.getColumn('F').width = 35; // FÓRMULA
+    worksheet.getColumn('G').width = 35; // NOMBRE
+    worksheet.getColumn('H').width = 12; // LEGAJOS
+    worksheet.getColumn('I').width = 12; // DOCS
+    worksheet.getColumn('J').width = 12; // FECHA PRIMERO
+    worksheet.getColumn('K').width = 12; // FECHA ÚLTIMO
+    worksheet.getColumn('L').width = 25; // UBICACIÓN
+    worksheet.getColumn('M').width = 20; // OBSERVACIONES
 
     return await workbook.xlsx.writeBuffer() as ExcelJS.Buffer;
   }
 
-  // Generar reporte de inventario por unidad
+  // Generar INVENTARIO UAA (formato UAA.xlsx - inventario interno)
+  async generarInventarioUAA(
+    unidadId?: string,
+    userRol?: string,
+    userUnidadId?: string | null
+  ): Promise<ExcelJS.Buffer> {
+    // Si no se especifica unidad, usar la del usuario (para UAA)
+    const targetUnidadId = unidadId || userUnidadId;
+
+    if (!targetUnidadId) {
+      throw new AppError('Debe especificar una unidad administrativa', 400);
+    }
+
+    // Verificar permisos
+    if (
+      userRol !== 'ADMIN' &&
+      userRol !== 'COORDINADOR_ARCHIVO' &&
+      targetUnidadId !== userUnidadId
+    ) {
+      throw new AppError('No tiene permisos para generar este reporte', 403);
+    }
+
+    // Obtener expedientes de la unidad
+    const expedientes = await prisma.expediente.findMany({
+      where: { unidadAdministrativaId: targetUnidadId },
+      orderBy: [
+        { seccionId: 'asc' },
+        { serieId: 'asc' },
+        { numeroExpediente: 'asc' },
+      ],
+      include: {
+        unidadAdministrativa: true,
+        seccion: true,
+        serie: true,
+        subserie: true,
+      },
+    });
+
+    // Crear libro de Excel según formato UAA.xlsx
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('2024'); // Nombre de hoja según año actual
+
+    // Fila 2: Encabezados
+    const headers = [
+      { col: 'A', value: 'Sección' },
+      { col: 'B', value: '  Serie' }, // Nota: tiene espacios para indentación
+      { col: 'C', value: 'Subserie' },
+      { col: 'D', value: 'Nombre' },
+      { col: 'E', value: 'Total de Fojas ' }, // Nota: tiene espacio al final
+      { col: 'F', value: 'Legajos' },
+      { col: 'G', value: 'Fecha de inicio' },
+      { col: 'H', value: 'Fecha de Cierre' },
+      { col: 'I', value: 'No. De Caja' },
+      { col: 'J', value: 'Prestado a /Fecha' },
+      { col: 'K', value: 'Devolución' },
+    ];
+
+    headers.forEach(({ col, value }) => {
+      const cell = worksheet.getCell(`${col}2`);
+      cell.value = value;
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD9E1F2' },
+      };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+
+    // Agrupar expedientes por sección
+    const expedientesPorSeccion = expedientes.reduce((acc, exp) => {
+      const seccionClave = exp.seccion.clave;
+      if (!acc[seccionClave]) {
+        acc[seccionClave] = {
+          seccion: exp.seccion,
+          expedientes: [],
+        };
+      }
+      acc[seccionClave].expedientes.push(exp);
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Agregar datos agrupados por sección
+    let currentRow = 3;
+
+    Object.values(expedientesPorSeccion).forEach((grupo: any) => {
+      // Fila de sección
+      worksheet.getCell(`A${currentRow}`).value = grupo.seccion.clave;
+      worksheet.getCell(`D${currentRow}`).value = grupo.seccion.nombre;
+
+      // Estilo para fila de sección
+      ['A', 'D'].forEach(col => {
+        const cell = worksheet.getCell(`${col}${currentRow}`);
+        cell.font = { bold: true };
+      });
+
+      currentRow++;
+
+      // Expedientes de esta sección
+      grupo.expedientes.forEach((exp: any) => {
+        // Serie en columna B (con indentación)
+        const serieClave = exp.serie.clave;
+        worksheet.getCell(`B${currentRow}`).value = serieClave;
+
+        // Subserie en columna C (si existe)
+        if (exp.subserie) {
+          worksheet.getCell(`C${currentRow}`).value = exp.subserie.clave;
+        }
+
+        // Nombre del expediente
+        worksheet.getCell(`D${currentRow}`).value = exp.serie.nombre;
+
+        // Total de fojas
+        if (exp.totalFojas > 0) {
+          worksheet.getCell(`E${currentRow}`).value = exp.totalFojas;
+        }
+
+        // Legajos
+        if (exp.totalLegajos > 0) {
+          worksheet.getCell(`F${currentRow}`).value = exp.totalLegajos;
+        }
+
+        // Fecha de inicio (apertura)
+        if (exp.fechaApertura) {
+          worksheet.getCell(`G${currentRow}`).value = exp.fechaApertura;
+          worksheet.getCell(`G${currentRow}`).numFmt = 'yyyy-mm-dd hh:mm:ss';
+        }
+
+        // Fecha de cierre
+        if (exp.fechaCierre) {
+          worksheet.getCell(`H${currentRow}`).value = exp.fechaCierre;
+          worksheet.getCell(`H${currentRow}`).numFmt = 'yyyy-mm-dd hh:mm:ss';
+        }
+
+        currentRow++;
+      });
+    });
+
+    // Ajustar anchos de columna
+    worksheet.getColumn('A').width = 10;  // Sección
+    worksheet.getColumn('B').width = 12;  // Serie
+    worksheet.getColumn('C').width = 12;  // Subserie
+    worksheet.getColumn('D').width = 60;  // Nombre
+    worksheet.getColumn('E').width = 15;  // Total de Fojas
+    worksheet.getColumn('F').width = 10;  // Legajos
+    worksheet.getColumn('G').width = 20;  // Fecha inicio
+    worksheet.getColumn('H').width = 20;  // Fecha cierre
+    worksheet.getColumn('I').width = 12;  // No. De Caja
+    worksheet.getColumn('J').width = 20;  // Prestado a
+    worksheet.getColumn('K').width = 15;  // Devolución
+
+    return await workbook.xlsx.writeBuffer() as ExcelJS.Buffer;
+  }
+
+  // Método de compatibilidad (usa el inventario general)
+  async generarInventarioExcel(
+    filters: any = {},
+    userRol?: string,
+    userUnidadId?: string | null
+  ): Promise<ExcelJS.Buffer> {
+    return this.generarInventarioGeneral(filters, userRol, userUnidadId);
+  }
+
+  // Generar reporte de inventario por unidad (usa inventario general)
   async generarInventarioPorUnidad(
     unidadId: string,
     userRol?: string,
@@ -252,7 +461,7 @@ export class ReportesService {
       throw new AppError('No tiene permisos para generar este reporte', 403);
     }
 
-    return this.generarInventarioExcel({ unidadAdministrativaId: unidadId }, userRol, userUnidadId);
+    return this.generarInventarioGeneral({ unidadAdministrativaId: unidadId }, userRol, userUnidadId);
   }
 
   // Generar reporte de estadísticas

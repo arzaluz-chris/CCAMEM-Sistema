@@ -13,6 +13,7 @@ router.get('/stats', reportesController.getStats.bind(reportesController));
 // Reportes de inventario
 router.get('/inventario/general', reportesController.generarInventarioGeneral.bind(reportesController));
 router.get('/inventario/unidad/:unidadId', reportesController.generarInventarioPorUnidad.bind(reportesController));
+router.get('/inventario/uaa/:unidadId?', reportesController.generarInventarioUAA.bind(reportesController));
 
 // Reporte de estadísticas
 router.get('/estadisticas', reportesController.generarEstadisticas.bind(reportesController));
